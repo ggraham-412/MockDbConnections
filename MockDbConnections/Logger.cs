@@ -11,11 +11,14 @@ namespace MockDbConnections
     /// </summary>
     public static class Logger
     {
-        private static Action<string> LoggerImpl { get; set; } = null;
+        public static ILog LoggerImpl { get; set; } = null;
 
         public static void Log(string message)
         {
-            LoggerImpl?.Invoke(message);
+            if (LoggerImpl == null)
+                return;
+
+            LoggerImpl.Log(message);
         }
     }
 }

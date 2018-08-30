@@ -54,6 +54,7 @@
   <ItemGroup>
     <Compile Include="Account.cs" />
     <Compile Include="IDbConnectionFactory.cs" />
+    <Compile Include="ILog.cs" />
     <Compile Include="Logger.cs" />
     <Compile Include="Mocks\ADataReader.cs" />
     <Compile Include="Mocks\ADbCommand.cs" />

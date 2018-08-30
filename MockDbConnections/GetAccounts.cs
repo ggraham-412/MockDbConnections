@@ -27,7 +27,11 @@ namespace MockDbConnections
             {
                 try
                 {
-                    retval = (int)cmd.ExecuteScalar();
+                    object val = cmd.ExecuteScalar();
+                    if (val != null)
+                        retval = (int)val;
+                    else
+                        Logger.Log($"Could not find portfolio id for '{name}'");
                 }
                 catch (Exception ex)
                 {
@@ -55,21 +59,28 @@ namespace MockDbConnections
                     try
                     {
                         var reader = cmd.ExecuteReader();
-                        while ( reader.Read() )
+                        while (reader.Read())
                         {
-                            retval.Add(new Account()
+                            try
                             {
-                                AccountId = reader.GetInt32(0),
-                                PortfolioId = reader.GetInt32(1),
-                                OwnerId = reader.GetInt32(2),
-                                AccountNumber = reader.GetString(3),
-                                Balance = reader.GetDecimal(4)
-                            });
+                                retval.Add(new Account()
+                                {
+                                    AccountId = reader.GetInt32(0),
+                                    PortfolioId = reader.GetInt32(1),
+                                    OwnerId = reader.GetInt32(2),
+                                    AccountNumber = reader.GetString(3),
+                                    Balance = reader.GetDecimal(4)
+                                });
+                            }
+                            catch (Exception ex)
+                            {
+                                Logger.Log("Caught parse exception: " + ex.Message);
+                            }
                         }
                     }
                     catch (Exception ex)
                     {
-                        Logger.Log("Caught exception: " + ex.Message);
+                        Logger.Log("Caught read exception: " + ex.Message);
                     }
                 }
             }
