@@ -19,22 +19,6 @@ namespace MockDbConnections
             // The example is of accounts and portfolios.  A portfolio contains zero or 
             // many accounts.  An account belongs to one portfolio.
 
-            // Maps a portfolio name to an id for the test
-            Dictionary<string, int> portfolioIds = new Dictionary<string, int>()
-            {
-                {"One", 1 },
-                {"Two", 2 },
-                {"Three", 3 }
-            };
-
-            // A set of test accounts
-            List<object[]> testCase = new List<object[]>();
-            testCase.Add(new object[] { 1, 1, 2, "ABC123", 100.00m });
-            testCase.Add(new object[] { 2, 2, 3, "DEF456", 200.00m });
-            testCase.Add(new object[] { 3, 3, 2, "GHI789", 300.00m });
-            testCase.Add(new object[] { 4, 2, 3, "JKL012", 400.00m });
-            testCase.Add(new object[] { 5, 1, 3, "MNO345", 500.00m });
-
             // Mock the logger
             List<string> loggerStatements = new List<string>();
             var logImpl = Substitute.For<ILog>();
@@ -43,51 +27,24 @@ namespace MockDbConnections
                 .Do(x => loggerStatements.Add((string)x[0]));
             Logger.LoggerImpl = logImpl;
 
-            // Mock a connection factory
-            var provider = Substitute.For<IDbConnectionFactory>();
-            provider.CreateConnection(Arg.Any<string>()).Returns(
-                x =>
+            // Use a real connection factory
+            var provider = new NPGConnectionFactory();
+
+            var cxnString = "Host=localhost; Port=5432; Database=postgres; Username=postgres; Password=postgres;";
+
+            // prep
+            using (var cxn = provider.CreateConnection(cxnString))
+            {
+                cxn.Open();
+
+                using (var cmd = provider.CreateCommand(@"select public.populatetestcase();",cxn))
                 {
-                    var retval = Substitute.For<ADbConnection>();
-                    retval.ConnectionString = (string)x[0];
-                    return retval;
-                });
-            provider.CreateCommand(Arg.Any<string>(), Arg.Any<IDbConnection>()).Returns(
-                x =>
-                {
-                    var retval = Substitute.For<ADbCommand>();
-                    retval.CommandText = (string)x[0];
-                    retval.Connection = (IDbConnection)x[1];
-
-                    // condition the command based on the SQL statement
-
-                    // Is it asking for a portfolio id?
-                    var regexGetPort = new Regex(@"select id from portfolio where port_name = '(\w+)';");
-                    if ( regexGetPort.IsMatch(retval.CommandText) ) 
-                    {
-                        var mtGetPort = regexGetPort.Match(retval.CommandText);
-                        string portName = mtGetPort.Groups[1].Value;
-                        if (portfolioIds.ContainsKey(portName))
-                            retval.ScalarResult = portfolioIds[mtGetPort.Groups[1].Value];
-                        else
-                            retval.ScalarResult = null;
-                    }
-
-                    // Or is it asking for a list of accounts?
-                    var regexGetAcct = new Regex(@"select id, portfolio_id, owner_id, account_number, balance from account where portfolio_id = (\d+);");
-                    if ( regexGetAcct.IsMatch(retval.CommandText))
-                    {
-                        var mtGetAcct = regexGetAcct.Match(retval.CommandText);
-                        var readerResult = Substitute.For<ADataReader>(); 
-                        readerResult.RowSet = testCase.Where(y => ((int)y[1]) == int.Parse(mtGetAcct.Groups[1].Value)).ToList();
-                        retval.ReaderResult = readerResult;
-                    }
-
-                    return retval;
-                });
+                    cmd.ExecuteNonQuery();
+                }
+            }
 
             // Create the object under test
-            GetAccounts getAccounts = new GetAccounts(provider, "ConnectionString");
+            GetAccounts getAccounts = new GetAccounts(provider, cxnString);
 
             // Do a bunch of positive test cases
             var accts = getAccounts.GetAccountsForPortfolio("One");
@@ -111,13 +68,6 @@ namespace MockDbConnections
             Debug.Assert(loggerStatements.Count == 1);
             Debug.Assert(loggerStatements[0] == @"Could not find portfolio id for 'Four'");
             loggerStatements.Clear();
-
-            // Do an exception case - should skip the bad record and return the others
-            testCase.Insert(0, new object[] { 6, 1, 3, "PQR678", "BadValue" });
-            accts = getAccounts.GetAccountsForPortfolio("One");
-            Debug.Assert(accts.Count == 2);
-            Debug.Assert(loggerStatements.Count == 1);
-            Debug.Assert(loggerStatements[0].StartsWith("Caught parse exception:"));
         }
     }
 }
