@@ -1,2 +1,4 @@
 # MockDbConnections
-Mockable abstract classes for .Net IDbConnection and related
+Mockable abstract classes for .Net IDbConnection and related classes
+
+
